@@ -50,6 +50,6 @@ def create_cqm(n, k, alpha, beta, Delta, importance_values):
 
 
 def create_bqm(cqm):
-    bqm, invert = dimod.cqm_to_bqm(cqm)
+    bqm, invert = dimod.cqm_to_bqm(cqm, lagrange_multiplier=5.0)
     print(f"Interactions: {bqm.num_interactions} Var: {bqm.num_variables}")
     return bqm, invert

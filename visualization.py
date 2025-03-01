@@ -13,8 +13,7 @@ def visualize_graph(n, Delta, points, selected_medoids_list, compute_objective, 
     - Delta: Similarity matrix
     - points: 2D coordinates of points
     - selected_medoids_list: List of lists, where each sublist contains a different set of selected medoids
-    - alpha: Tradeoff parameter for dispersion
-    - beta: Tradeoff parameter for centrality
+    - compute_objective: Function to compute the objective values
     - figure_title: Title of the figure
     """
     num_graphs = len(selected_medoids_list)
@@ -31,7 +30,7 @@ def visualize_graph(n, Delta, points, selected_medoids_list, compute_objective, 
         ax = axes[idx]
         G = nx.Graph()
 
-        dispersion_val, centrality_val = compute_objective(selected_medoids)
+        dispersion_val, centrality_val, importance_val = compute_objective(selected_medoids)
 
         for i in range(n):
             G.add_node(i, pos=(points[i, 0], points[i, 1]))
@@ -50,42 +49,40 @@ def visualize_graph(n, Delta, points, selected_medoids_list, compute_objective, 
                                      edge_labels={(i, j): f"{Delta[i, j]:.2f}" for i, j in G.edges()}, 
                                      font_size=7, ax=ax)
 
-        ax.set_title(f"Sol {idx + 1} | Obj: {dispersion_val + centrality_val:.4f} | Disp: {dispersion_val:.4f} | Cen: {centrality_val:.4f}")
+        ax.set_title(f"Sol {idx + 1} | Obj: {dispersion_val + centrality_val + importance_val:.4f} | Disp: {dispersion_val:.4f} | Cen: {centrality_val:.4f} | Imp: {importance_val:.4f}")
 
     for j in range(idx + 1, rows * cols):
         fig.delaxes(axes[j])
 
     plt.tight_layout()
 
-def draw_chart_obj_fun(selected_medoids_list, compute_objective, figure_title="Objective Function Values"):
+def draw_chart_obj_fun_medoids(selected_medoids_list, compute_objective, figure_title="Objective Function Values"):
     """
-    Plots separate charts for the values of dispersion_val + centrality_val, dispersion_val, and centrality_val.
+    Plots separate charts for the values of dispersion_val + centrality_val + importance_val, dispersion_val, centrality_val, and importance_val.
     
     Parameters:
-    - n: Number of nodes
-    - Delta: Similarity matrix
-    - points: 2D coordinates of points
     - selected_medoids_list: List of lists, where each sublist contains a different set of selected medoids
-    - alpha: Tradeoff parameter for dispersion
-    - beta: Tradeoff parameter for centrality
+    - compute_objective: Function to compute the objective values
     - figure_title: Title of the figure
     """
     obj_values = []
     dispersion_values = []
     centrality_values = []
+    importance_values = []
 
     for selected_medoids in selected_medoids_list:
         dispersion_val, centrality_val, importance_val = compute_objective(selected_medoids)
-        obj_values.append(dispersion_val + centrality_val)
+        obj_values.append(dispersion_val + centrality_val + importance_val)
         dispersion_values.append(dispersion_val)
         centrality_values.append(centrality_val)
+        importance_values.append(importance_val)
 
-    fig, axes = plt.subplots(3, 1, figsize=(10, 18))
+    fig, axes = plt.subplots(4, 1, figsize=(10, 24))
     fig.canvas.manager.set_window_title(figure_title)
     fig.suptitle(figure_title, fontsize=16)
 
-    axes[0].plot(obj_values, label='Objective Value (Dispersion + Centrality)', marker='o')
-    axes[0].set_title('Objective Value (Dispersion + Centrality)')
+    axes[0].plot(obj_values, label='Objective Value (Dispersion + Centrality + Importance)', marker='o')
+    axes[0].set_title('Objective Value (Dispersion + Centrality + Importance)')
     axes[0].set_xlabel('Solution Index')
     axes[0].set_ylabel('Value')
     axes[0].legend()
@@ -105,25 +102,36 @@ def draw_chart_obj_fun(selected_medoids_list, compute_objective, figure_title="O
     axes[2].legend()
     axes[2].yaxis.set_major_locator(FixedLocator(centrality_values))
 
+    axes[3].plot(importance_values, label='Importance Value', marker='o')
+    axes[3].set_title('Importance Value')
+    axes[3].set_xlabel('Solution Index')
+    axes[3].set_ylabel('Value')
+    axes[3].legend()
+    axes[3].yaxis.set_major_locator(FixedLocator(importance_values))
+
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-
-
-    
 def plot_medoids_on_map(df_5g, df_taxi, selected_medoids, map_title="Selected Medoids"):
     map_center = [df_5g["lat"].mean(), df_5g["lon"].mean()]
     map_5g = folium.Map(location=map_center, zoom_start=12)
 
-    for medoid in selected_medoids:
-        row = df_5g.iloc[medoid]
+    for _, row in df_5g.iterrows():
         folium.CircleMarker(
-        location=[row["lat"], row["lon"]],
+            location=[row["lat"], row["lon"]],
             radius=5,
-            color="red",
+            color="blue",
             fill=True,
             fill_color="blue",
             fill_opacity=0.6,
             popup=f"Cell ID: {row['cell']} | Signal: {row.get('averageSignal', 'N/A')}",
+        ).add_to(map_5g)
+
+    for medoid in selected_medoids:
+        row = df_5g.iloc[int(medoid)]
+        folium.Marker(
+            location=[row["lat"], row["lon"]],
+            popup=f"Medoid Cell ID: {row['cell']} | Signal: {row.get('averageSignal', 'N/A')}",
+            icon=folium.Icon(color='red', icon='info-sign')
         ).add_to(map_5g)
 
     heat_data = list(zip(df_taxi["lat"], df_taxi["lon"]))

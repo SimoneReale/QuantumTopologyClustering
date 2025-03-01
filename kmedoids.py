@@ -2,14 +2,15 @@ import dimod
 from dimod import SimulatedAnnealingSampler
 from dwave.system import LeapHybridCQMSampler
 import numpy as np
-from visualization import visualize_graph, draw_chart_obj_fun, plot_medoids_on_map
+from visualization import visualize_graph, draw_chart_obj_fun_medoids, plot_medoids_on_map
 from sys import stdout
 from scipy.spatial.distance import cdist
 from create_medoids_cqm import create_cqm, create_bqm
 import matplotlib.pyplot as plt
 from alive_progress import alive_bar
 from dwave.preprocessing.composites import FixVariablesComposite
-from create_dataset import create_pechino_dataset
+from create_dataset import create_pechino_dataset, create_reduced_dataset
+from solvers import simple_simulated_annealing, roof_duality_simulated_annealing, exact_cqm_solve
 
 
 
@@ -21,15 +22,19 @@ from create_dataset import create_pechino_dataset
 # Delta = 1 - np.exp(-0.5 * dist_matrix)
 
 
+# - k: Number of medoids
+k = 20   
+
+Delta, n, df_5g, df_taxi, importance_values = create_reduced_dataset(N_CLUSTERS=25)
 
 Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset()
 
-# - k: Number of medoids
-k = 20   
+
 # - alpha: Tradeoff parameter for dispersion
-alpha = 1 * (1.0 / k)
+alpha = 1.2 * (1.0 / k)
 # - beta: Tradeoff parameter for centrality
 beta = 1 * (1.0 / n)
+
 
 with alive_bar(1) as bar:
     print("Creo CQM")
@@ -38,33 +43,25 @@ with alive_bar(1) as bar:
 
 with alive_bar(1) as bar:
     print("Creo BQM")
-    create_bqm(cqm)
+    bqm, invert = create_bqm(cqm)
     bar()
 
-bqm, invert = create_bqm(cqm)
 
-with alive_bar(1) as bar:
-    print("Fixed roof duality")
-    sampler_fixed = FixVariablesComposite(SimulatedAnnealingSampler(), algorithm='roof_duality')
-    solution_bqm_fixed = sampler_fixed.sample(bqm)
-    selected_medoids_bqm_fixed = [[i for i in range(n) if sample[f'z_{i}'] == 1] for sample in solution_bqm_fixed.samples()][:6]
-    bar()
+selected_medoids_bqm = simple_simulated_annealing(bqm, invert, n, 20)
+#selected_medoids_exact = exact_cqm_solve(cqm, n, 20)
 
-with alive_bar(1) as bar:   
-    print("No preprocessing")
-    sampler = SimulatedAnnealingSampler()
-    solution_bqm = sampler.sample(bqm)
-    selected_medoids_bqm = [[i for i in range(n) if sample[f'z_{i}'] == 1] for sample in solution_bqm.samples()][:6]
-    bar()
+
 
 # visualize_graph(n, Delta, points, selected_medoids_bqm, alpha, beta, compute_objective, "Simple bqm")
 # visualize_graph(n, Delta, points, selected_medoids_bqm_fixed, alpha, beta, compute_objective, "Fixed roof duality")
 
-draw_chart_obj_fun(selected_medoids_bqm, compute_objective, figure_title="Simple bqm")
-draw_chart_obj_fun(selected_medoids_bqm_fixed, compute_objective, figure_title="Fixed bqm")
+draw_chart_obj_fun_medoids(selected_medoids_bqm, compute_objective, figure_title="Simple bqm")
+#draw_chart_obj_fun_medoids(selected_medoids_exact, compute_objective, figure_title="Exact cqm")
+# draw_chart_obj_fun(selected_medoids_bqm_fixed, compute_objective, figure_title="Fixed bqm")
 
-# Plot the selected medoids on the map
+
 plot_medoids_on_map(df_5g, df_taxi, selected_medoids_bqm[0], "Simple_bqm_medoids")
-plot_medoids_on_map(df_5g, df_taxi, selected_medoids_bqm_fixed[0], "Fixed_bqm_medoids")
+#plot_medoids_on_map(df_5g, df_taxi, selected_medoids_exact[0], "Exact_cqm_medoids")
+# plot_medoids_on_map(df_5g, df_taxi, selected_medoids_bqm_fixed[0], "Fixed_bqm_medoids")
 
 plt.show()
