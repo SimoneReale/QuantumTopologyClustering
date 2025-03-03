@@ -4,12 +4,12 @@ from dwave.preprocessing.composites import FixVariablesComposite
 from dwave.preprocessing.presolve import Presolver
 
 
-def simple_simulated_annealing(bqm, invert, num_of_nodes, num_of_sol):
+def simple_simulated_annealing(bqm, num_of_nodes, num_of_sol):
     with alive_bar(1) as bar:   
         print("No preprocessing")
         sampler = SimulatedAnnealingSampler()
         solution_bqm = sampler.sample(bqm)
-        selected_medoids_bqm = [[i for i in range(num_of_nodes) if invert(sample)[f'z_{i}'] == 1] for sample in solution_bqm.samples()][:num_of_sol]
+        selected_medoids_bqm = [[i for i in range(num_of_nodes) if sample[f'z_{i}'] == 1] for sample in solution_bqm.samples()][:num_of_sol]
         bar()
     return selected_medoids_bqm
 

@@ -123,14 +123,14 @@ def plot_medoids_on_map(df_5g, df_taxi, selected_medoids, map_title="Selected Me
             fill=True,
             fill_color="blue",
             fill_opacity=0.6,
-            popup=f"Cell ID: {row['cell']} | Signal: {row.get('averageSignal', 'N/A')}",
+            popup=f"Cell ID: {row['cell']} | Importance: {row['importance']} | Taxi Count: {row['taxi_count']}",
         ).add_to(map_5g)
 
     for medoid in selected_medoids:
         row = df_5g.iloc[int(medoid)]
         folium.Marker(
             location=[row["lat"], row["lon"]],
-            popup=f"Medoid Cell ID: {row['cell']} | Signal: {row.get('averageSignal', 'N/A')}",
+            popup=f"Medoid Cell ID: {row['cell']} | Importance: {row['importance']} | Taxi Count: {row['taxi_count']}",
             icon=folium.Icon(color='red', icon='info-sign')
         ).add_to(map_5g)
 

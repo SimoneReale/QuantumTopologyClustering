@@ -51,10 +51,12 @@ def create_pechino_dataset():
 
     dist_matrix = cdist(df_5g[["lat", "lon"]].values, df_5g[["lat", "lon"]].values, metric='euclidean')
 
-    Delta = 1 - np.exp(-0.5 * dist_matrix)
+    # Delta = 1 - np.exp(-0.5 * dist_matrix)
+    Delta = dist_matrix
 
     importance_values = df_5g["taxi_count"].values
     importance_values = 1 * (importance_values / importance_values.max())  # Normalize to [0, 1]
+    df_5g["importance"] = importance_values
 
     return Delta, len(df_5g), df_5g, df_taxi, importance_values
 
@@ -83,6 +85,7 @@ def create_reduced_dataset(N_CLUSTERS):
 
     importance_values_reduced = df_selected["taxi_count"].values
     importance_values_reduced = 2 * (importance_values_reduced / importance_values_reduced.max())
+    df_selected["importance"] = importance_values_reduced
 
     return Delta_reduced, len(df_selected), df_selected, df_taxi, importance_values_reduced
 
