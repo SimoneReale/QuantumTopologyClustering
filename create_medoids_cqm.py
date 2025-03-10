@@ -1,9 +1,9 @@
-import dimod
 from dwave.preprocessing.presolve import Presolver
 from dwave.preprocessing.lower_bounds import roof_duality
 import numpy as np
+import dimod
 
-importance_normalization_parameter = 0
+importance_normalization_parameter = 1
 
 def create_cqm(n, k, alpha, beta, Delta, importance_values):
     """
@@ -51,11 +51,6 @@ def create_cqm(n, k, alpha, beta, Delta, importance_values):
 
     return cqm, compute_objective
 
-def create_bqm(cqm):
-    bqm, invert = dimod.cqm_to_bqm(cqm)
-    print(f"Interactions: {bqm.num_interactions} Var: {bqm.num_variables}")
-    return bqm, invert
-
 def create_native_bqm(n, k, alpha, beta, Delta, importance_values):
     """
     Creates a native Binary Quadratic Model (BQM) for the k-medoids problem with bias towards important points.
@@ -77,7 +72,7 @@ def create_native_bqm(n, k, alpha, beta, Delta, importance_values):
     # Objective function
     dispersion = -alpha * sum(Delta[i, j] * z[i] * z[j] for i in range(n) for j in range(n) if i != j)
     centrality = beta * sum(Delta[i, j] * z[i] for i in range(n) for j in range(n))
-    importance_bias = -1 * sum(importance_values[i] * z[i] for i in range(n))
+    importance_bias = -importance_normalization_parameter * sum(importance_values[i] * z[i] for i in range(n))
 
     objective = dispersion + centrality + importance_bias
 
@@ -92,39 +87,8 @@ def create_native_bqm(n, k, alpha, beta, Delta, importance_values):
 
     return bqm
 
-def create_kmeans_cqm(n, k, Delta):
-    """
-    Creates a Constrained Quadratic Model (CQM) for the k-means clustering problem using a distance matrix.
 
-    Parameters:
-    - n: Number of data points
-    - k: Number of clusters
-    - Delta: Distance matrix
 
-    Returns:
-    - cqm: The CQM model
-    """
-    cqm = dimod.ConstrainedQuadraticModel()
-    z = {(i, j): dimod.Binary(f'z_{i}_{j}') for i in range(n) for j in range(k)}
-
-    # Objective function: minimize the sum of squared distances to the cluster centroids
-    objective = dimod.QuadraticModel()
-    for i in range(n):
-        for j in range(k):
-            objective.add_variable(f'z_{i}_{j}', dimod.BINARY)
-            objective.add_quadratic(f'z_{i}_{j}', f'z_{i}_{j}', Delta[i, j] ** 2)
-
-    cqm.set_objective(objective)
-
-    # Constraints: each point is assigned to exactly one cluster
-    for i in range(n):
-        cqm.add_constraint(sum(z[i, j] for j in range(k)) == 1, label=f'assign_point_{i}')
-
-    # Constraints: exactly k clusters
-    for j in range(k):
-        cqm.add_constraint(sum(z[i, j] for i in range(n)) >= 1, label=f'cluster_{j}')
-
-    return cqm
 
 
 
