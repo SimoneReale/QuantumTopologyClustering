@@ -139,8 +139,8 @@ def calculate_importance_radius(df_5g, df_taxi, radius):
     importance_values = 1 * (importance_values / importance_values.max())  # Normalize to [0, 1]
     return importance_values
 
-def create_reduced_dataset(N_CLUSTERS):
-    Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset()
+def create_reduced_dataset(N_CLUSTERS, filter_radius=10000):
+    Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(filter_radius)
 
     coords = df_5g[["lat", "lon"]].to_numpy()
     kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=42, n_init=10)
@@ -208,7 +208,8 @@ def plot_distance_spread(Delta, importance_values_standard, importance_values_ra
 
 if __name__ == "__main__":
     filter_radius = 10000
-    Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(filter_radius)
+    Delta, n, df_5g, df_taxi, importance_values = create_reduced_dataset(N_CLUSTERS=20, filter_radius=filter_radius)
+    # Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(filter_radius)
     importance_values_standard = calculate_importance_standard(df_5g)
     radius = 3000
     importance_values_radius = calculate_importance_radius(df_5g, df_taxi, radius)
