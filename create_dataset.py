@@ -5,43 +5,9 @@ from scipy.spatial.distance import cdist, euclidean
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 
-def create_pechino_dataset(filter_radius=10000):
-    MIN_LAT, MAX_LAT = 39.5, 41.0
-    MIN_LON, MAX_LON = 115.5, 117.5
 
-    df_taxi = pd.read_csv(
-        "taxi_data/taxi_data_8.txt",
-        header=None,
-        names=["taxi_id", "datetime", "lon", "lat"],
-    )
 
-    file_path_antennas = "csv5G/460.csv"
-    column_names = [
-        "radio",
-        "mcc",
-        "net",
-        "area",
-        "cell",
-        "unit",
-        "lon",
-        "lat",
-        "range",
-        "samples",
-        "changeable",
-        "created",
-        "updated",
-        "averageSignal",
-    ]
-    df_antennas = pd.read_csv(file_path_antennas, names=column_names, skiprows=1)
-
-    df_5g_unfiltered = df_antennas[df_antennas["radio"].str.contains("LTE", na=False)]
-    df_5g = df_5g_unfiltered[
-        (df_5g_unfiltered["mcc"] == 460)
-        & (df_5g_unfiltered["lat"].between(MIN_LAT, MAX_LAT))
-        & (df_5g_unfiltered["lon"].between(MIN_LON, MAX_LON))
-    ].copy()
-
-    def filter_taxi_calls(df_taxi, df_5g, radius):
+def filter_taxi_calls(df_taxi, df_5g, radius):
         """
         Filter out taxi calls that don't have any antenna within a specified radius.
 
@@ -60,47 +26,24 @@ def create_pechino_dataset(filter_radius=10000):
         filtered_df_taxi = df_taxi.iloc[valid_indices].reset_index(drop=True)
         return filtered_df_taxi
 
-    
-    df_taxi = filter_taxi_calls(df_taxi, df_5g, filter_radius)
 
-    antenna_tree = cKDTree(df_5g[["lat", "lon"]].values)
-    _, nearest_antennas = antenna_tree.query(df_taxi[["lat", "lon"]].values)
+# Calculate distance matrix in meters using the Haversine formula
+def haversine(lat1, lon1, lat2, lon2):
+    """
+    Calculate the great-circle distance between two points on the Earth specified in decimal degrees.
+    Returns the distance in meters.
+    """
+    # Convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
 
-    taxi_count_per_antenna = np.bincount(nearest_antennas, minlength=len(df_5g))
-    df_5g["taxi_count"] = taxi_count_per_antenna
-    df_5g = df_5g[df_5g["taxi_count"] > 0]
+    # Haversine formula
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+    c = 2 * np.arcsin(np.sqrt(a))
+    r = 6371000  # Radius of Earth in meters
+    return c * r
 
-    print("Number of antennas: ", len(df_5g))
-
-    # Calculate distance matrix in meters using the Haversine formula
-    def haversine(lat1, lon1, lat2, lon2):
-        """
-        Calculate the great-circle distance between two points on the Earth specified in decimal degrees.
-        Returns the distance in meters.
-        """
-        # Convert decimal degrees to radians
-        lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
-
-        # Haversine formula
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
-        c = 2 * np.arcsin(np.sqrt(a))
-        r = 6371000  # Radius of Earth in meters
-        return c * r
-
-    dist_matrix = np.zeros((len(df_5g), len(df_5g)))
-    for i in range(len(df_5g)):
-        for j in range(len(df_5g)):
-            if i != j:
-                dist_matrix[i, j] = haversine(df_5g.iloc[i]["lat"], df_5g.iloc[i]["lon"], df_5g.iloc[j]["lat"], df_5g.iloc[j]["lon"])
-
-    Delta = dist_matrix 
-
-    importance_values = calculate_importance_standard(df_5g)
-    df_5g["importance"] = importance_values
-
-    return Delta, len(df_5g), df_5g, df_taxi, importance_values
 
 def calculate_importance_standard(df_5g):
     """
@@ -139,8 +82,73 @@ def calculate_importance_radius(df_5g, df_taxi, radius):
     importance_values = 1 * (importance_values / importance_values.max())  # Normalize to [0, 1]
     return importance_values
 
-def create_reduced_dataset(N_CLUSTERS, filter_radius=10000):
-    Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(filter_radius)
+def create_pechino_dataset(filter_radius=10000, is_importance_radius=True):
+    MIN_LAT, MAX_LAT = 39.5, 41.0
+    MIN_LON, MAX_LON = 115.5, 117.5
+
+    df_taxi = pd.read_csv(
+        "taxi_data/taxi_data_5.txt",
+        header=None,
+        names=["taxi_id", "datetime", "lon", "lat"],
+    )
+
+    file_path_antennas = "csv5G/460.csv"
+    column_names = [
+        "radio",
+        "mcc",
+        "net",
+        "area",
+        "cell",
+        "unit",
+        "lon",
+        "lat",
+        "range",
+        "samples",
+        "changeable",
+        "created",
+        "updated",
+        "averageSignal",
+    ]
+    df_antennas = pd.read_csv(file_path_antennas, names=column_names, skiprows=1)
+
+    df_5g_unfiltered = df_antennas[df_antennas["radio"].str.contains("LTE", na=False)]
+    df_5g = df_5g_unfiltered[
+        (df_5g_unfiltered["mcc"] == 460)
+        & (df_5g_unfiltered["lat"].between(MIN_LAT, MAX_LAT))
+        & (df_5g_unfiltered["lon"].between(MIN_LON, MAX_LON))
+    ].copy()
+
+    df_taxi = filter_taxi_calls(df_taxi, df_5g, filter_radius)
+
+    antenna_tree = cKDTree(df_5g[["lat", "lon"]].values)
+    _, nearest_antennas = antenna_tree.query(df_taxi[["lat", "lon"]].values)
+
+    taxi_count_per_antenna = np.bincount(nearest_antennas, minlength=len(df_5g))
+    df_5g["taxi_count"] = taxi_count_per_antenna
+    df_5g = df_5g[df_5g["taxi_count"] > 0]
+
+    print("Number of antennas: ", len(df_5g))
+
+    dist_matrix = np.zeros((len(df_5g), len(df_5g)))
+    for i in range(len(df_5g)):
+        for j in range(len(df_5g)):
+            if i != j:
+                dist_matrix[i, j] = haversine(df_5g.iloc[i]["lat"], df_5g.iloc[i]["lon"], df_5g.iloc[j]["lat"], df_5g.iloc[j]["lon"])
+
+    Delta = dist_matrix 
+    if is_importance_radius:
+        importance_values = calculate_importance_radius(df_5g, df_taxi, filter_radius)
+    else:
+        importance_values = calculate_importance_standard(df_5g)
+
+    df_5g["importance"] = importance_values
+
+    return Delta, len(df_5g), df_5g, df_taxi, importance_values
+
+
+
+def create_reduced_dataset(N_CLUSTERS, filter_radius=10000, is_importance_radius=True):
+    Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(filter_radius, is_importance_radius=is_importance_radius)
 
     coords = df_5g[["lat", "lon"]].to_numpy()
     kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=42, n_init=10)
@@ -162,9 +170,14 @@ def create_reduced_dataset(N_CLUSTERS, filter_radius=10000):
     dist_matrix_reduced = cdist(df_selected[["lat", "lon"]].values, df_selected[["lat", "lon"]].values, metric='euclidean')
     Delta_reduced = dist_matrix_reduced  # Use the distance matrix directly in meters
 
-    importance_values_reduced = df_selected["taxi_count"].values
-    importance_values_reduced = 2 * (importance_values_reduced / importance_values_reduced.max())
+
+    if is_importance_radius:
+        importance_values_reduced = calculate_importance_radius(df_selected, df_taxi, filter_radius)
+    else:
+        importance_values_reduced = calculate_importance_standard(df_selected)
     df_selected["importance"] = importance_values_reduced
+
+    print(f"Return values: {Delta_reduced.shape} {len(df_selected)} {len(df_taxi)} {importance_values_reduced.shape}")
 
     return Delta_reduced, len(df_selected), df_selected, df_taxi, importance_values_reduced
 
@@ -188,7 +201,7 @@ def plot_distance_spread(Delta, importance_values_standard, importance_values_ra
     plt.xlabel('Distance (meters)')
     plt.ylabel('Frequency')
     plt.grid(True)
-    plt.show()
+   
 
     plt.figure(figsize=(10, 6))
     plt.hist(importance_values_standard, bins=50, edgecolor='black')
@@ -196,7 +209,6 @@ def plot_distance_spread(Delta, importance_values_standard, importance_values_ra
     plt.xlabel('Importance Value')
     plt.ylabel('Frequency')
     plt.grid(True)
-    plt.show()
 
     plt.figure(figsize=(10, 6))
     plt.hist(importance_values_radius, bins=50, edgecolor='black')
@@ -207,9 +219,9 @@ def plot_distance_spread(Delta, importance_values_standard, importance_values_ra
     plt.show()
 
 if __name__ == "__main__":
-    filter_radius = 10000
-    Delta, n, df_5g, df_taxi, importance_values = create_reduced_dataset(N_CLUSTERS=20, filter_radius=filter_radius)
-    # Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(filter_radius)
+    filter_radius = 5000
+    #Delta, n, df_5g, df_taxi, importance_values = create_reduced_dataset(N_CLUSTERS=20, filter_radius=filter_radius)
+    Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(filter_radius)
     importance_values_standard = calculate_importance_standard(df_5g)
     radius = 3000
     importance_values_radius = calculate_importance_radius(df_5g, df_taxi, radius)

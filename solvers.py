@@ -4,7 +4,8 @@ from dwave.preprocessing.composites import FixVariablesComposite
 from dwave.preprocessing.presolve import Presolver
 from ortools.sat.python import cp_model
 import numpy as np
-from dwave.system import DWaveSampler, EmbeddingComposite
+from dwave.system import DWaveSampler, EmbeddingComposite, LeapHybridCQMSampler
+from config import tokenuccio
 
 def simple_simulated_annealing(bqm, num_of_nodes, num_of_sol):
     with alive_bar(1) as bar:   
@@ -94,6 +95,16 @@ def quantum_annealing(bqm, num_of_nodes, num_of_sol):
         selected_medoids_bqm = [[i for i in range(num_of_nodes) if sample[f'z_{i}'] == 1] for sample in solution_bqm.samples()][:num_of_sol]
         bar()
     return selected_medoids_bqm
+
+def hybrid_cqm_solve(cqm, num_of_nodes, num_of_sol):
+    with alive_bar(1) as bar:
+        print("Hybrid CQM solver")
+        sampler = LeapHybridCQMSampler(token=tokenuccio)
+        result = sampler.sample_cqm(cqm)
+        feasible_samples = result.filter(lambda d: d.is_feasible)
+        selected_medoids = [[i for i in range(num_of_nodes) if sample[f'z_{i}'] == 1] for sample in feasible_samples.samples()[:num_of_sol]]
+        bar()
+    return selected_medoids
 
 
 

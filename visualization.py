@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator
 import folium
 from folium.plugins import HeatMap
-from create_dataset import create_pechino_dataset
+from create_dataset import create_pechino_dataset, create_reduced_dataset
 
 def visualize_graph(n, Delta, points, selected_medoids_list, compute_objective, figure_title="Graph Visualization"):
     """
@@ -147,7 +147,7 @@ def draw_chart_obj_fun_medoids(selected_medoids_list, compute_objective, Delta, 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
 
-def plot_medoids_on_map(df_5g, df_taxi, selected_medoids, Delta, coverage_radius, map_title="Selected Medoids"):
+def plot_medoids_on_map(df_5g, df_taxi, selected_medoids, Delta, coverage_radius, map_title="Selected Medoids", plot_radius=True):
     """
     Plots the selected medoids on a map, draws coverage radius circles, 
     and connects them with lines displaying distances.
@@ -187,14 +187,15 @@ def plot_medoids_on_map(df_5g, df_taxi, selected_medoids, Delta, coverage_radius
         ).add_to(map_5g)
 
         # Coverage radius circle
-        folium.Circle(
-            location=[row["lat"], row["lon"]],
-            radius=coverage_radius,  # Coverage radius in meters
-            color="red",
-            fill=True,
-            fill_color="red",
-            fill_opacity=0.2
-        ).add_to(map_5g)
+        if plot_radius:
+            folium.Circle(
+                location=[row["lat"], row["lon"]],
+                radius=coverage_radius,  # Coverage radius in meters
+                color="red",
+                fill=True,
+                fill_color="red",
+                fill_opacity=0.2
+            ).add_to(map_5g)
 
     # Draw lines between selected medoids and add distances
     for i in range(len(selected_medoids)):
@@ -231,7 +232,7 @@ def plot_medoids_on_map(df_5g, df_taxi, selected_medoids, Delta, coverage_radius
     map_5g.save(f"folium_output/{map_title}.html")
 
 
-def visualize_map_antennas_heatmap(df_5g, df_taxi, map_title="Antennas and Taxi Heatmap"):
+def visualize_map_antennas_heatmap(df_5g, df_taxi, coverage_radius = 0, map_title="Antennas and Taxi Heatmap"):
     """
     Plots the antennas with the taxi count and the heatmap.
 
@@ -254,13 +255,24 @@ def visualize_map_antennas_heatmap(df_5g, df_taxi, map_title="Antennas and Taxi 
             popup=f"Cell ID: {row['cell']} | Taxi Count: {row['taxi_count']}",
         ).add_to(map_5g)
 
+    if coverage_radius != 0:
+        # Coverage radius circle
+            folium.Circle(
+                location=[row["lat"], row["lon"]],
+                radius=coverage_radius,  # Coverage radius in meters
+                color="red",
+                fill=True,
+                fill_color="red",
+                fill_opacity=0.2
+            ).add_to(map_5g)
+
     heat_data = list(zip(df_taxi["lat"], df_taxi["lon"]))
     HeatMap(heat_data).add_to(map_5g)
 
     map_5g.save(f"folium_output/{map_title}.html")
 
 if __name__ == "__main__":
-    Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(filter_radius=30000)
+    Delta, n, df_5g, df_taxi, importance_values = create_reduced_dataset(N_CLUSTERS=80, filter_radius=6000)
     visualize_map_antennas_heatmap(df_5g, df_taxi, map_title="Antennas and Taxi Heatmap")
 
 
