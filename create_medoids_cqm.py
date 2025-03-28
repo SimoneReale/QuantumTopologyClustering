@@ -3,7 +3,7 @@ from dwave.preprocessing.lower_bounds import roof_duality
 import numpy as np
 import dimod
 
-importance_normalization_parameter = 1
+lambda_ = 1
 
 def create_cqm(n, k, alpha, beta, Delta, importance_values):
     """
@@ -26,7 +26,7 @@ def create_cqm(n, k, alpha, beta, Delta, importance_values):
 
     dispersion = -alpha * sum(Delta[i, j] * z[i] * z[j] for i in range(n) for j in range(n) if i != j)
     centrality = beta * sum(Delta[i, j] * z[i] for i in range(n) for j in range(n))
-    importance_bias = -importance_normalization_parameter * sum(importance_values[i] * z[i] for i in range(n))
+    importance_bias = -lambda_ * sum(importance_values[i] * z[i] for i in range(n))
 
     cqm.set_objective(dispersion + centrality + importance_bias)
     #cqm.set_objective(dispersion + centrality)
@@ -46,12 +46,12 @@ def create_cqm(n, k, alpha, beta, Delta, importance_values):
         """
         dispersion_val = -alpha * sum(Delta[i, j] for i in selected_medoids for j in selected_medoids if i != j)
         centrality_val = beta * sum(Delta[i, j] for i in selected_medoids for j in range(n))
-        importance_val = -importance_normalization_parameter * sum(importance_values[i] for i in selected_medoids)
+        importance_val = -lambda_ * sum(importance_values[i] for i in selected_medoids)
         return dispersion_val, centrality_val, importance_val
 
     return cqm, compute_objective
 
-def create_native_bqm(n, k, alpha, beta, Delta, importance_values):
+def create_native_bqm(n, k, alpha, beta, Delta, lagrange_multiplier):
     """
     Creates a native Binary Quadratic Model (BQM) for the k-medoids problem with bias towards important points.
 
@@ -66,15 +66,17 @@ def create_native_bqm(n, k, alpha, beta, Delta, importance_values):
     Returns:
     - bqm: The BQM model
     """
+    #normalizzo delta
+    Delta = Delta / Delta.max()
+
     bqm = dimod.BinaryQuadraticModel('BINARY')
     z = {i: dimod.Binary(f'z_{i}') for i in range(n)}
 
     # Objective function
     dispersion = -alpha * sum(Delta[i, j] * z[i] * z[j] for i in range(n) for j in range(n) if i != j)
     centrality = beta * sum(Delta[i, j] * z[i] for i in range(n) for j in range(n))
-    importance_bias = -importance_normalization_parameter * sum(importance_values[i] * z[i] for i in range(n))
 
-    objective = dispersion + centrality + importance_bias
+    objective = dispersion + centrality
 
     for i in range(n):
         bqm.add_variable(f'z_{i}', objective.linear[f'z_{i}'])
@@ -82,8 +84,7 @@ def create_native_bqm(n, k, alpha, beta, Delta, importance_values):
         bqm.add_interaction(f'z_{i}', f'z_{j}', bias)
 
     # Constraint: exactly k medoids
-    constraint = sum(z[i] for i in range(n)) - k
-    bqm.add_linear_equality_constraint([(f'z_{i}', 1) for i in range(n)], constant=-k, lagrange_multiplier=2.0)
+    bqm.add_linear_equality_constraint([(f'z_{i}', 1) for i in range(n)], constant=-k, lagrange_multiplier=lagrange_multiplier)
 
     return bqm
 

@@ -172,6 +172,100 @@ def create_bqm_even_spread(n, k, Delta, min_distance, lagrange_multiplier, impor
 
     return bqm, compute_objective
 
+def create_bqm_p_median(n, k, Delta, min_distance, lagrange_multiplier, importance_values, demand_assign=1.0, selection_constr=1.0, lambda_=1.0):
+    """
+    Creates a BQM for the p-Median problem.
+
+    Parameters:
+    - n: Number of potential service (facility) locations
+    - k: Number of medoids
+    - Delta: Distance matrix (n x n) between service locations and demand points
+    - min_distance: Minimum allowed distance between medoids
+    - lagrange_multiplier: Strength of the constraint enforcing exactly k medoids
+    - importance_values: Array of importance values for each point
+    - c_p: Penalty coefficient for demand assignment constraint
+    - c_s: Penalty coefficient for selection constraint
+    - lambda_: Weight for importance biasing
+
+    Returns:
+    - bqm: The Binary Quadratic Model
+    - compute_objective: A function to evaluate penalties, rewards, and constraints given a solution.
+    """
+    bqm = dimod.BinaryQuadraticModel('BINARY')
+
+    # Normalize min_distance between 0 and 1
+    min_distance_normalized = min_distance / Delta.max()
+    Delta = Delta / Delta.max()
+
+    # Decision variables
+    z = {i: dimod.Binary(f'z_{i}') for i in range(n)}
+    x = {(i, j): dimod.Binary(f'x_{i}_{j}') for i in range(n) for j in range(n)}
+
+    # Objective function: Minimize total assignment cost
+    for i in range(n):
+        for j in range(n):
+            bqm.add_linear(f'x_{i}_{j}', Delta[i, j])
+
+    # Constraint: Each demand point must be assigned to exactly one service location
+    for j in range(n):
+        bqm.add_linear_equality_constraint(
+            [(f'x_{i}_{j}', 1) for i in range(n)], constant=-1, lagrange_multiplier=demand_assign
+        )
+
+    # Constraint: A demand point can only be assigned to an active service location
+    for i in range(n):
+        for j in range(n):
+            bqm.add_quadratic(f'x_{i}_{j}', f'z_{i}', -selection_constr)
+
+    # Constraint: Select exactly k medoids
+    bqm.add_linear_equality_constraint(
+        [(f'z_{i}', 1) for i in range(n)], constant=-k, lagrange_multiplier=lagrange_multiplier
+    )
+
+    # Add importance bias
+    for i in range(n):
+        bqm.add_linear(f'z_{i}', -lambda_ * importance_values[i])
+
+    def compute_objective(selected_medoids, Delta, importance_values):
+        """Computes objective function components for a given set of selected medoids."""
+        # Normalize Delta between 0 and 1
+        Delta = Delta / Delta.max()
+        penalty_term = 0
+        spread_term = 0
+        importance_term = 0
+        constraint_violation = 0
+
+        num_selected = len(selected_medoids)
+
+        # Compute penalties and rewards
+        for i in selected_medoids:
+            for j in selected_medoids:
+                if i < j:
+                    distance = Delta[i, j]
+                    if distance < min_distance_normalized:
+                        penalty_term += demand_assign * (min_distance_normalized - distance)
+                    else:
+                        spread_term += -selection_constr * distance
+        
+        # Compute importance bias
+        importance_term = -lambda_ * sum(importance_values[i] for i in selected_medoids)
+
+        # Compute constraint violation
+        constraint_violation = lagrange_multiplier * (num_selected - k) ** 2
+
+        total_objective = penalty_term + spread_term + importance_term + constraint_violation
+        dict_objective = {
+            "total_objective": total_objective,
+            "penalty_term": penalty_term,
+            "spread_term": spread_term,
+            "importance_term": importance_term,
+            "constraint_violation": constraint_violation
+        }
+
+        return dict_objective
+
+    return bqm, compute_objective
+
 def calculate_all_terms(n, k, Delta, min_distance, importance_values, c_p=1.0, c_s=1.0, lambda_=1.0, lagrange_multiplier=1.0):
     """
     Calculates the sum of all penalties, spread terms, importance terms, and the constraint term if all medoids are chosen.

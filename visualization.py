@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator
 import folium
 from folium.plugins import HeatMap
-from create_dataset import create_pechino_dataset, create_reduced_dataset
+from create_dataset import create_pechino_dataset, create_reduced_dataset, haversine
 
 def visualize_graph(n, Delta, points, selected_medoids_list, compute_objective, figure_title="Graph Visualization"):
     """
@@ -57,14 +57,16 @@ def visualize_graph(n, Delta, points, selected_medoids_list, compute_objective, 
 
     plt.tight_layout()
 
-def draw_chart_obj_fun_medoids(selected_medoids_list, compute_objective, Delta, figure_title="Objective Function Values"):
+def draw_chart_obj_fun_medoids(selected_medoids_list, compute_objective, Delta, df_taxi, df_5g, radius, figure_title="Objective Function Values"):
     """
-    Plots separate charts for the values of dispersion_val + centrality_val + importance_val, dispersion_val, centrality_val, importance_val, constraint value, total distance between medoids, and shortest distance between any medoid.
+    Plots separate charts for the values of dispersion_val + centrality_val + importance_val, dispersion_val, centrality_val, importance_val, constraint value, total distance between medoids, shortest distance between any medoid, and number of uncovered taxi calls.
     
     Parameters:
     - selected_medoids_list: List of lists, where each sublist contains a different set of selected medoids
     - compute_objective: Function to compute the objective values
     - Delta: Similarity matrix
+    - df_taxi: DataFrame containing the taxi data
+    - radius: Coverage radius of each medoid in meters
     - figure_title: Title of the figure
     """
     obj_values = []
@@ -74,6 +76,8 @@ def draw_chart_obj_fun_medoids(selected_medoids_list, compute_objective, Delta, 
     constraint_values = []
     total_distance_values = []
     shortest_distance_values = []
+    uncovered_taxi_calls_values = []
+    uncovered_taxi_calls_percentage_values = []
 
     for selected_medoids in selected_medoids_list:
         dispersion_val, centrality_val, importance_val = compute_objective(selected_medoids)
@@ -91,60 +95,99 @@ def draw_chart_obj_fun_medoids(selected_medoids_list, compute_objective, Delta, 
         shortest_distance = min(Delta[i, j] for i in selected_medoids for j in selected_medoids if i != j)
         shortest_distance_values.append(shortest_distance)
 
-    fig, axes = plt.subplots(7, 1, figsize=(10, 42))
-    fig.canvas.manager.set_window_title(figure_title)
-    fig.suptitle(figure_title, fontsize=16)
+        # Calculate number of uncovered taxi calls
+        uncovered_taxi_calls = 0
+        for _, taxi in df_taxi.iterrows():
+            covered = False
+            for medoid in selected_medoids:
+                if haversine(taxi["lat"], taxi["lon"], df_5g.iloc[medoid]["lat"], df_5g.iloc[medoid]["lon"]) <= radius:
+                    covered = True
+                    break
+            if not covered:
+                uncovered_taxi_calls += 1
+        uncovered_taxi_calls_values.append(uncovered_taxi_calls)
+        uncovered_taxi_calls_percentage_values.append(uncovered_taxi_calls / len(df_taxi) * 100)
 
-    axes[0].plot(obj_values, label='Objective Value (Dispersion + Centrality + Importance)', marker='o')
-    axes[0].set_title('Objective Value (Dispersion + Centrality + Importance)')
-    axes[0].set_xlabel('Solution Index')
-    axes[0].set_ylabel('Value')
-    axes[0].legend()
-    axes[0].yaxis.set_major_locator(FixedLocator(obj_values))
+    # Create multiple figures to avoid clutter
+    num_charts = 9
+    charts_per_figure = 3
+    num_figures = (num_charts + charts_per_figure - 1) // charts_per_figure
 
-    axes[1].plot(dispersion_values, label='Dispersion Value', marker='o')
-    axes[1].set_title('Dispersion Value')
-    axes[1].set_xlabel('Solution Index')
-    axes[1].set_ylabel('Value')
-    axes[1].legend()
-    axes[1].yaxis.set_major_locator(FixedLocator(dispersion_values))
+    for fig_idx in range(num_figures):
+        fig, axes = plt.subplots(charts_per_figure, 1, figsize=(10, 18))
+        fig.canvas.manager.set_window_title(f"{figure_title} - Part {fig_idx + 1}")
+        fig.suptitle(f"{figure_title} - Part {fig_idx + 1}", fontsize=16)
 
-    axes[2].plot(centrality_values, label='Centrality Value', marker='o')
-    axes[2].set_title('Centrality Value')
-    axes[2].set_xlabel('Solution Index')
-    axes[2].set_ylabel('Value')
-    axes[2].legend()
-    axes[2].yaxis.set_major_locator(FixedLocator(centrality_values))
+        start_idx = fig_idx * charts_per_figure
+        end_idx = min(start_idx + charts_per_figure, num_charts)
 
-    axes[3].plot(importance_values, label='Importance Value', marker='o')
-    axes[3].set_title('Importance Value')
-    axes[3].set_xlabel('Solution Index')
-    axes[3].set_ylabel('Value')
-    axes[3].legend()
-    axes[3].yaxis.set_major_locator(FixedLocator(importance_values))
+        for chart_idx in range(start_idx, end_idx):
+            ax = axes[chart_idx - start_idx]
+            if chart_idx == 0:
+                ax.plot(obj_values, label='Objective Value (Dispersion + Centrality + Importance)', marker='o')
+                ax.set_title('Objective Value (Dispersion + Centrality + Importance)')
+                ax.set_xlabel('Solution Index')
+                ax.set_ylabel('Value')
+                ax.legend()
+                ax.yaxis.set_major_locator(FixedLocator(obj_values))
+            elif chart_idx == 1:
+                ax.plot(dispersion_values, label='Dispersion Value', marker='o')
+                ax.set_title('Dispersion Value')
+                ax.set_xlabel('Solution Index')
+                ax.set_ylabel('Value')
+                ax.legend()
+                ax.yaxis.set_major_locator(FixedLocator(dispersion_values))
+            elif chart_idx == 2:
+                ax.plot(centrality_values, label='Centrality Value', marker='o')
+                ax.set_title('Centrality Value')
+                ax.set_xlabel('Solution Index')
+                ax.set_ylabel('Value')
+                ax.legend()
+                ax.yaxis.set_major_locator(FixedLocator(centrality_values))
+            elif chart_idx == 3:
+                ax.plot(importance_values, label='Importance Value', marker='o')
+                ax.set_title('Importance Value')
+                ax.set_xlabel('Solution Index')
+                ax.set_ylabel('Value')
+                ax.legend()
+                ax.yaxis.set_major_locator(FixedLocator(importance_values))
+            elif chart_idx == 4:
+                ax.plot(constraint_values, label='Constraint Value (Number of Selected Medoids)', marker='o')
+                ax.set_title('Constraint Value (Number of Selected Medoids)')
+                ax.set_xlabel('Solution Index')
+                ax.set_ylabel('Value')
+                ax.legend()
+                ax.yaxis.set_major_locator(FixedLocator(constraint_values))
+            elif chart_idx == 5:
+                ax.plot(total_distance_values, label='Total Distance Between Medoids', marker='o')
+                ax.set_title('Total Distance Between Medoids')
+                ax.set_xlabel('Solution Index')
+                ax.set_ylabel('Value')
+                ax.legend()
+                ax.yaxis.set_major_locator(FixedLocator(total_distance_values))
+            elif chart_idx == 6:
+                ax.plot(shortest_distance_values, label='Shortest Distance Between Any Medoid', marker='o')
+                ax.set_title('Shortest Distance Between Any Medoid')
+                ax.set_xlabel('Solution Index')
+                ax.set_ylabel('Value')
+                ax.legend()
+                ax.yaxis.set_major_locator(FixedLocator(shortest_distance_values))
+            elif chart_idx == 7:
+                ax.plot(uncovered_taxi_calls_values, label='Uncovered Taxi Calls (Absolute)', marker='o')
+                ax.set_title('Uncovered Taxi Calls (Absolute)')
+                ax.set_xlabel('Solution Index')
+                ax.set_ylabel('Number of Uncovered Taxi Calls')
+                ax.legend()
+                ax.yaxis.set_major_locator(FixedLocator(uncovered_taxi_calls_values))
+            elif chart_idx == 8:
+                ax.plot(uncovered_taxi_calls_percentage_values, label='Uncovered Taxi Calls (Percentage)', marker='o')
+                ax.set_title('Uncovered Taxi Calls (Percentage)')
+                ax.set_xlabel('Solution Index')
+                ax.set_ylabel('Percentage of Uncovered Taxi Calls')
+                ax.legend()
+                ax.yaxis.set_major_locator(FixedLocator(uncovered_taxi_calls_percentage_values))
 
-    axes[4].plot(constraint_values, label='Constraint Value (Number of Selected Medoids)', marker='o')
-    axes[4].set_title('Constraint Value (Number of Selected Medoids)')
-    axes[4].set_xlabel('Solution Index')
-    axes[4].set_ylabel('Value')
-    axes[4].legend()
-    axes[4].yaxis.set_major_locator(FixedLocator(constraint_values))
-
-    axes[5].plot(total_distance_values, label='Total Distance Between Medoids', marker='o')
-    axes[5].set_title('Total Distance Between Medoids')
-    axes[5].set_xlabel('Solution Index')
-    axes[5].set_ylabel('Value')
-    axes[5].legend()
-    axes[5].yaxis.set_major_locator(FixedLocator(total_distance_values))
-
-    axes[6].plot(shortest_distance_values, label='Shortest Distance Between Any Medoid', marker='o')
-    axes[6].set_title('Shortest Distance Between Any Medoid')
-    axes[6].set_xlabel('Solution Index')
-    axes[6].set_ylabel('Value')
-    axes[6].legend()
-    axes[6].yaxis.set_major_locator(FixedLocator(shortest_distance_values))
-
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
 
 
 def plot_medoids_on_map(df_5g, df_taxi, selected_medoids, Delta, coverage_radius, map_title="Selected Medoids", plot_radius=True):
@@ -197,6 +240,7 @@ def plot_medoids_on_map(df_5g, df_taxi, selected_medoids, Delta, coverage_radius
                 fill_opacity=0.2
             ).add_to(map_5g)
 
+
     # Draw lines between selected medoids and add distances
     for i in range(len(selected_medoids)):
         for j in range(i + 1, len(selected_medoids)):
@@ -222,6 +266,23 @@ def plot_medoids_on_map(df_5g, df_taxi, selected_medoids, Delta, coverage_radius
             folium.Marker(
                 location=[mid_lat, mid_lon],
                 icon=folium.DivIcon(html=f'<div style="font-size: 12px; color: green;">{distance:.2f} m</div>')
+            ).add_to(map_5g)
+
+    for _, taxi in df_taxi.iterrows():
+        covered = False
+        for medoid in selected_medoids:
+            if haversine(taxi["lat"], taxi["lon"], df_5g.iloc[medoid]["lat"], df_5g.iloc[medoid]["lon"]) <= coverage_radius:
+                covered = True
+                break
+        if not covered:
+            folium.CircleMarker(
+                location=[taxi["lat"], taxi["lon"]],
+                radius=5,
+                color="black",
+                fill=True,
+                fill_color="black",
+                fill_opacity=0.6,
+                popup=f"Uncovered Taxi Call",
             ).add_to(map_5g)
 
     # Add heatmap for taxi data
