@@ -9,6 +9,7 @@ def create_taxi_splits_with_edge_calls(
 ):
     """
     Creates personalized splits of the taxi dataset, keeping only rows where an edge function call occurs.
+    If there are not enough points, an interpolation process is performed to create new calls.
 
     Parameters:
     folder_path (str): Path to the folder containing taxi log files.
@@ -57,6 +58,11 @@ def create_taxi_splits_with_edge_calls(
             taxi_id = df["taxi_id"].iloc[0]
             lambda_calls = avg_calls_per_taxi_per_hour * time_interval_hours
             num_calls = np.random.poisson(lambda_calls)  # Number of calls for this taxi
+            
+            if len(df) < num_calls:
+                # Perform interpolation to generate additional points
+                df = interpolate_missing_points(df, num_calls - len(df))
+            
             call_indices = np.random.choice(len(df), min(num_calls, len(df)), replace=False)
             return df.iloc[call_indices]
         
@@ -68,5 +74,47 @@ def create_taxi_splits_with_edge_calls(
     
     print(f"{num_splits} splits with edge calls saved in {output_folder}")
 
+def interpolate_missing_points(df, num_missing_points):
+    """
+    Interpolates missing points for a taxi's data to fill the void.
+
+    Parameters:
+    df (DataFrame): DataFrame containing the taxi's data.
+    num_missing_points (int): Number of points to interpolate.
+
+    Returns:
+    DataFrame: DataFrame with interpolated points added.
+    """
+    # Sort the data by datetime
+    df = df.sort_values(by="datetime").reset_index(drop=True)
+    
+    # Generate timestamps for the missing points
+    min_time = df["datetime"].min()
+    max_time = df["datetime"].max()
+    new_times = pd.date_range(start=min_time, end=max_time, periods=len(df) + num_missing_points)[-num_missing_points:]
+    
+    # Interpolate latitude and longitude
+    interpolated_latitudes = np.interp(
+        np.linspace(0, len(df) - 1, len(df) + num_missing_points),
+        np.arange(len(df)),
+        df["latitude"]
+    )
+    interpolated_longitudes = np.interp(
+        np.linspace(0, len(df) - 1, len(df) + num_missing_points),
+        np.arange(len(df)),
+        df["longitude"]
+    )
+    
+    # Create a DataFrame for the interpolated points
+    interpolated_df = pd.DataFrame({
+        "taxi_id": df["taxi_id"].iloc[0],
+        "datetime": new_times,
+        "longitude": interpolated_longitudes[-num_missing_points:],
+        "latitude": interpolated_latitudes[-num_missing_points:]
+    })
+    
+    # Combine the original and interpolated data
+    return pd.concat([df, interpolated_df], ignore_index=True).sort_values(by="datetime")
+
 if __name__ == "__main__":
-    create_taxi_splits_with_edge_calls("./complete_taxi_data", "splits", 100, 8, 1, avg_calls_per_taxi_per_hour=20)
+    create_taxi_splits_with_edge_calls("./complete_taxi_data", "splits", 200, 4, 1, avg_calls_per_taxi_per_hour=20)

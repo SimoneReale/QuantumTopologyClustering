@@ -98,10 +98,11 @@ def quantum_annealing(bqm, num_of_nodes, num_of_sol):
                         token=tokenuccio,
                         endpoint="https://na-west-1.cloud.dwavesys.com/sapi/v2/",
                         solver="Advantage_system7.1",
+                        chain_strength=3000.0,
                     ))
 
         solution_bqm = sampler.sample(bqm, num_reads=1000)
-        dwave.inspector.show(solution_bqm)
+        #dwave.inspector.show(solution_bqm)
         selected_medoids_bqm = [[i for i in range(num_of_nodes) if sample[f'z_{i}'] == 1] for sample in solution_bqm.samples()][:num_of_sol]
         bar()
     return selected_medoids_bqm

@@ -472,9 +472,30 @@ def create_bqm_even_spread(n, k, Delta, min_distance, importance, alpha=1.0, bet
 
 
 
+import time 
 
 if __name__ == "__main__":
-    Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset()
-    # create_bqm_even_spread(n, 20, Delta, 300, 1, 10000, 1)
+    
+    Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(
+            3000, taxi_data_file=f"splits/split_1.txt"
+        )
+    times = []
+    for _ in range(5):
+        start_time = time.time()
+        bqm, _ = create_bqm_even_spread(
+        n,
+        20,
+        Delta,
+        3000,
+        c_p=1,
+        c_s=1,
+        lambda_=1,
+        lagrange_multiplier=2,
+        importance_values=importance_values,
+    )
+        end_time = time.time()
+        dataset_creation_time = end_time - start_time
+        times.append(dataset_creation_time)
     # create_cqm_even_spread(n, 20, Delta, 300, 1)
-    create_bqm_only_penalty(n, 20, Delta, 3000, importance_values, alpha=100, lambda_=0.01)
+    #create_bqm_only_penalty(n, 20, Delta, 3000, importance_values, alpha=100, lambda_=0.01)
+    print(f"Average time to create BQM: {np.mean(times)} seconds Standard deviation: {np.std(times)} seconds")

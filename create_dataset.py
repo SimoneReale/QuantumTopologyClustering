@@ -5,6 +5,7 @@ from scipy.spatial.distance import cdist, euclidean
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from visualization.visualize_map_antennas import visualize_map_antennas_heatmap
+import time  # Import the time module
 
 
 def filter_taxi_calls(df_taxi, df_5g, radius):
@@ -198,10 +199,16 @@ def create_pechino_dataset(filter_radius=10000, is_importance_radius=True, taxi_
 
     Delta = dist_matrix
 
+    start_time = time.time()
     if is_importance_radius:
         importance_values = calculate_combined_importance(df_5g, df_taxi, filter_radius)
     else:
         importance_values = calculate_importance_standard(df_5g)
+
+    end_time = time.time()
+    dataset_creation_time = end_time - start_time
+
+    print(f"Time taken to calculate importance values: {dataset_creation_time:.2f} seconds")
 
     df_5g["importance"] = importance_values
 
@@ -306,14 +313,21 @@ def plot_distance_spread(Delta, importance_values_combined, importance_values_ra
 
 
 if __name__ == "__main__":
-    filter_radius = 3000
-    #Delta, n, df_5g, df_taxi, importance_values = create_reduced_dataset(N_CLUSTERS=1000, filter_radius=filter_radius)
+    filter_radius = 8000
     split_name = "split_1"
-    Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(filter_radius, taxi_data_file=f"splits/{split_name}.txt")
-    # importance_values_standard = calculate_importance_standard(df_5g)
-    radius = 3000
-    # importance_values_combined = calculate_combined_importance(df_5g, df_taxi, radius)
-    # importance_values_radius = calculate_importance_radius(df_5g, df_taxi, radius)
-    #plot_distance_spread(Delta, importance_values_combined, importance_values_radius)
+    times = []
+    # Start timing the dataset creation
+    for _ in range(10):
+        Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(
+            filter_radius, taxi_data_file=f"splits/{split_name}.txt"
+        )
 
-    visualize_map_antennas_heatmap(df_5g, df_taxi, map_title=f"Antennas_and_Taxi_Heatmap_{split_name}")
+    
+    print(f"Average time: {np.mean(times):.2f} Standard deviation: {np.std(times):.2f}")
+
+    #print(f"Time taken to create the dataset and calculate importance values: {dataset_creation_time:.2f} seconds")
+    
+    # Visualize the map
+    # visualize_map_antennas_heatmap(
+    #     df_5g, df_taxi, map_title=f"Antennas_and_Taxi_Heatmap_{split_name}"
+    # )

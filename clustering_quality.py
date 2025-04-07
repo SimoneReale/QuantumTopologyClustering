@@ -27,8 +27,9 @@ def calculate_average_distances(df_taxi, df_5g, medoids_list):
         all_distances.append(min_distance)
     avg_distance = np.mean(all_distances)
     max_distance = np.max(all_distances)
+    min_distance = np.min(all_distances)
     std_distance = np.std(all_distances)
-    return max_distance, avg_distance, std_distance, all_distances
+    return max_distance, min_distance, avg_distance, std_distance, all_distances
 
 def calculate_min_max_ratio(df_taxi, df_5g, medoids_list):
     """

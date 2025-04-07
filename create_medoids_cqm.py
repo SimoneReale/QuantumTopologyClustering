@@ -2,10 +2,11 @@ from dwave.preprocessing.presolve import Presolver
 from dwave.preprocessing.lower_bounds import roof_duality
 import numpy as np
 import dimod
+from create_dataset import create_pechino_dataset
 
-lambda_ = 1
 
-def create_cqm(n, k, alpha, beta, Delta, importance_values):
+
+def create_cqm(n, k, alpha, beta, Delta, importance_values, lambda_=0.1):
     """
     Creates a Constrained Quadratic Model (CQM) for the k-medoids problem with bias towards important points.
 
@@ -26,10 +27,10 @@ def create_cqm(n, k, alpha, beta, Delta, importance_values):
 
     dispersion = -alpha * sum(Delta[i, j] * z[i] * z[j] for i in range(n) for j in range(n) if i != j)
     centrality = beta * sum(Delta[i, j] * z[i] for i in range(n) for j in range(n))
-    importance_bias = -lambda_ * sum(importance_values[i] * z[i] for i in range(n))
+    #importance_bias = -lambda_ * sum(importance_values[i] * z[i] for i in range(n))
 
-    cqm.set_objective(dispersion + centrality + importance_bias)
-    #cqm.set_objective(dispersion + centrality)
+    #cqm.set_objective(dispersion + centrality + importance_bias)
+    cqm.set_objective(dispersion + centrality)
 
     # Constraint: exactly k medoids 
     cqm.add_constraint(sum(z[i] for i in range(n)) == k, label='select_k_medoids')
@@ -89,7 +90,29 @@ def create_native_bqm(n, k, alpha, beta, Delta, lagrange_multiplier):
     return bqm
 
 
+import time
+if __name__ == "__main__":
+    times = []
 
+    filter_radius = 8000
+    Delta, n, df_5g, df_taxi, importance_values = create_pechino_dataset(filter_radius)
+    k = 20
+    alpha = 1 / k
+    beta = 1 / n
+    lagrange_multiplier = 2
+
+
+    for _ in range(5):
+        start_time = time.time()
+        bqm = create_native_bqm(n, k, alpha, beta, Delta, lagrange_multiplier)
+        print("Bqm num of bytes: ", bqm.nbytes())
+        end_time = time.time()
+        dataset_creation_time = end_time - start_time
+        print("Dataset creation time: ", dataset_creation_time)
+        times.append(dataset_creation_time)
+    # create_cqm_even_spread(n, 20, Delta, 300, 1)
+    #create_bqm_only_penalty(n, 20, Delta, 3000, importance_values, alpha=100, lambda_=0.01)
+    print(f"Average time to create BQM: {np.mean(times)} seconds Standard deviation: {np.std(times)} seconds")
 
 
 
