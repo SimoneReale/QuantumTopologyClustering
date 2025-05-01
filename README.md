@@ -1,13 +1,23 @@
-# QuantumTopologyClustering
+ ________  _________  ________     
+|\   __  \|\___   ___\\   ____\    
+\ \  \|\  \|___ \  \_\ \  \___|    
+ \ \  \\\  \   \ \  \ \ \  \       
+  \ \  \\\  \   \ \  \ \ \  \____  
+   \ \_____  \   \ \__\ \ \_______\
+    \|___| \__\   \|__|  \|_______|
+          \|__|                    
+                                   
+                                   
+
 
 A Python-based repository for clustering edge topologies. This project includes tools for dataset creation, clustering quality evaluation, and visualization of results.
 
 ## Features
 
-- **Clustering Algorithms**:
+- **Algorithms and Models**:
   - k-Medoids (native and sklearn implementations)
   - p-Median and hybrid approaches
-  - BQM and CQM-based with our M-DBC clustering model with simulated and true annealing
+  - BQM and CQM-based optimization models via our M-DBC clustering approach with simulated and true annealing
 
 - **Dataset Management**:
   - Creation of reduced and filtered datasets
@@ -26,6 +36,5 @@ A Python-based repository for clustering edge topologies. This project includes 
 - `create_dataset.py`: Tools for generating and preprocessing datasets.
 - `test_infrastructure.py`: Framework for testing clustering methods and saving results.
 - `draw_plots_test.py`: Visualization and table generation for clustering results.
-- `splits/`: Contains dataset splits for testing.
 - `tables/`: Stores generated tables with clustering metrics.
 - `plots/`: Contains visualizations of clustering results.
